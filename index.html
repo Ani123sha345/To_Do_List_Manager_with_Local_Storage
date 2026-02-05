@@ -1,0 +1,609 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>To Do List Manager</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #111735;
+      --panel-2: #0f1530;
+      --text: #e8ecff;
+      --muted: #9aa4c7;
+      --brand: #6aa3ff;
+      --ok: #56d364;
+      --warn: #ffcc66;
+      --danger: #ff7b72;
+      --border: #23305d;
+      --chip: #1b244a;
+      --focus: #8fb3ff;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #0a0f1f 0%, #0b1020 100%);
+      color: var(--text);
+      font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Noto Sans, sans-serif;
+    }
+    header {
+      position: sticky; top: 0; z-index: 2;
+      background: rgba(11,16,32,.85);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+    }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 16px; }
+    .title { font-size: 22px; font-weight: 700; letter-spacing: .3px; }
+    .row { display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; margin-top: 12px; }
+    input, select, textarea, button {
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      outline: none;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--focus); box-shadow: 0 0 0 3px rgba(143,179,255,.2); }
+    button { cursor: pointer; }
+    .btn { background: var(--brand); border: none; color: #07122c; font-weight: 700; box-shadow: var(--shadow); }
+    .btn.secondary { background: var(--chip); color: var(--text); box-shadow: none; }
+    .layout { display: grid; grid-template-columns: 260px 1fr; gap: 16px; padding: 16px; }
+    @media (max-width: 920px) { .layout { grid-template-columns: 1fr; } }
+    aside, main {
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      box-shadow: var(--shadow);
+    }
+    h2 { font-size: 16px; margin: 0 0 10px; color: var(--muted); font-weight: 700; }
+    .filters .group { margin-bottom: 14px; }
+    .chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: var(--chip);
+      border: 1px solid var(--border);
+      padding: 6px 10px; border-radius: 999px; margin: 4px 6px 0 0; font-size: 12px; color: var(--muted);
+      cursor: pointer; user-select: none;
+    }
+    .chip.active { color: var(--text); border-color: var(--focus); }
+    .list { display: grid; gap: 10px; }
+    .card {
+      display: grid; grid-template-columns: auto 1fr auto; gap: 12px; align-items: flex-start;
+      background: #0e1533; border: 1px solid var(--border); border-radius: 14px; padding: 12px;
+    }
+    .card.done { opacity: .65; }
+    .check { margin-top: 4px; }
+    .meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    .tag { background: var(--chip); border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px; font-size: 12px; color: var(--muted); }
+    .pri-low { color: var(--ok); }
+    .pri-medium { color: var(--warn); }
+    .pri-high { color: var(--danger); }
+    .actions button { background: transparent; border: 1px solid var(--border); padding: 6px 10px; border-radius: 8px; }
+    .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+    .muted { color: var(--muted); font-size: 13px; }
+    .searchbar { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 10px; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    .modal {
+      position: fixed; inset: 0; display: none; align-items: center; justify-content: center;
+      background: rgba(4,6,14,.6); z-index: 10;
+    }
+    .modal.open { display: flex; }
+    .modal .sheet { width: 640px; max-width: calc(100vw - 32px); background: var(--panel-2); border: 1px solid var(--border); border-radius: 16px; padding: 16px; box-shadow: var(--shadow); }
+    .sheet .row { grid-template-columns: 1fr 160px 150px; }
+    .sheet .row2 { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    footer { padding: 12px 16px 24px; color: var(--muted); text-align: center; }
+  </style>
+</head>
+<body>
+  <header aria-label="Add and search">
+    <div class="wrap">
+      <div class="title" aria-live="polite">To Do List Manager</div>
+      <form id="quickAdd" class="row" aria-label="Quick add">
+        <label class="sr-only" for="qaTitle">Task title</label>
+        <input id="qaTitle" name="title" placeholder="Task title" required />
+        <label class="sr-only" for="qaDue">Due date</label>
+        <input id="qaDue" name="due" type="date" />
+        <select id="qaPri" name="priority">
+          <option value="Medium">Medium</option>
+          <option value="Low">Low</option>
+          <option value="High">High</option>
+        </select>
+        <button class="btn" type="submit" title="Add task">Add</button>
+      </form>
+      <div class="searchbar">
+        <input id="search" placeholder="Search title or notes  press Slash to focus" aria-label="Search tasks" />
+        <select id="sort">
+          <option value="created-desc">Sort created new first</option>
+          <option value="created-asc">Sort created old first</option>
+          <option value="due-asc">Sort due date first</option>
+          <option value="due-desc">Sort due date last</option>
+          <option value="pri-desc">Sort priority high first</option>
+          <option value="pri-asc">Sort priority low first</option>
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="filters" aria-label="Filters">
+      <div class="group">
+        <h2>Status</h2>
+        <div>
+          <span class="chip" data-status="all">All</span>
+          <span class="chip" data-status="open">Open</span>
+          <span class="chip" data-status="done">Completed</span>
+        </div>
+      </div>
+      <div class="group">
+        <h2>Priority</h2>
+        <div>
+          <span class="chip" data-pri="High">High</span>
+          <span class="chip" data-pri="Medium">Medium</span>
+          <span class="chip" data-pri="Low">Low</span>
+        </div>
+      </div>
+      <div class="group">
+        <h2>Due window</h2>
+        <div>
+          <span class="chip" data-due="today">Today</span>
+          <span class="chip" data-due="week">This week</span>
+          <span class="chip" data-due="overdue">Overdue</span>
+          <span class="chip" data-due="none">No due date</span>
+        </div>
+      </div>
+      <div class="group">
+        <h2>Tags</h2>
+        <div id="tagChips" aria-live="polite"></div>
+      </div>
+      <div class="group">
+        <h2>Bulk actions</h2>
+        <div class="toolbar">
+          <button id="btnCompleteSelected" class="secondary">Complete selected</button>
+          <button id="btnDeleteSelected" class="secondary">Delete selected</button>
+          <button id="btnClearDone" class="secondary">Clear completed</button>
+        </div>
+      </div>
+      <div class="group">
+        <h2>Backup</h2>
+        <div class="toolbar">
+          <button id="btnExport" class="secondary">Export JSON</button>
+          <button id="btnImport" class="secondary">Import JSON</button>
+        </div>
+        <p class="muted">Your data is stored in this browser only</p>
+      </div>
+    </aside>
+
+    <main aria-label="Task list">
+      <div id="list" class="list" role="list"></div>
+      <div class="toolbar">
+        <span class="muted" id="stats" aria-live="polite"></span>
+      </div>
+    </main>
+  </div>
+
+  <footer>Made for interviews and demos. Keyboard shortcuts  Enter to add  Slash for search  C complete  E edit  Delete remove</footer>
+
+  <!-- Edit modal -->
+  <div id="modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
+    <div class="sheet">
+      <h2 id="editTitle">Edit task</h2>
+      <div class="row">
+        <input id="edTitle" placeholder="Title" />
+        <input id="edDue" type="date" />
+        <select id="edPri">
+          <option>High</option><option selected>Medium</option><option>Low</option>
+        </select>
+      </div>
+      <div class="row2">
+        <textarea id="edNotes" rows="4" placeholder="Notes"></textarea>
+        <input id="edTags" placeholder="Tags separated by comma" />
+      </div>
+      <div class="toolbar" style="justify-content:flex-end">
+        <button id="edCancel" class="secondary">Cancel</button>
+        <button id="edSave" class="btn">Save changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Storage service
+    const KEY = "tdms_v1";
+    const nowISO = () => new Date().toISOString();
+
+    function load() {
+      try {
+        const raw = localStorage.getItem(KEY);
+        if (!raw) return { tasks: [] };
+        const data = JSON.parse(raw);
+        if (!Array.isArray(data.tasks)) return { tasks: [] };
+        return data;
+      } catch {
+        return { tasks: [] };
+      }
+    }
+    function save(state) {
+      localStorage.setItem(KEY, JSON.stringify(state));
+    }
+    function nextId(state) {
+      // simple id using timestamp and a random suffix
+      return "t_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    // App state
+    let state = load();
+    let view = {
+      status: "all", // all open done
+      pris: new Set(),
+      due: null, // today week overdue none
+      tags: new Set(),
+      search: "",
+      sort: "created-desc",
+      selected: new Set()
+    };
+
+    // Elements
+    const listEl = document.getElementById("list");
+    const statsEl = document.getElementById("stats");
+    const tagChips = document.getElementById("tagChips");
+    const modal = document.getElementById("modal");
+    const ed = {
+      title: document.getElementById("edTitle"),
+      due: document.getElementById("edDue"),
+      pri: document.getElementById("edPri"),
+      notes: document.getElementById("edNotes"),
+      tags: document.getElementById("edTags"),
+    };
+    let editingId = null;
+
+    // Utilities
+    function parseTags(s) {
+      return s.split(",").map(x => x.trim()).filter(Boolean);
+    }
+    function fmtDate(d) {
+      if (!d) return "";
+      const dt = new Date(d + "T00:00:00");
+      return dt.toLocaleDateString();
+    }
+    function dueStatus(task) {
+      if (!task.due) return "none";
+      const today = new Date(); today.setHours(0,0,0,0);
+      const due = new Date(task.due + "T00:00:00");
+      const diff = (due - today) / 86400000;
+      if (diff < 0) return "overdue";
+      if (diff === 0) return "today";
+      if (diff <= 7) return "week";
+      return "future";
+    }
+    function priorityRank(p) {
+      return p === "High" ? 3 : p === "Medium" ? 2 : 1;
+    }
+
+    // Rendering
+    function render() {
+      // gather all tags
+      const allTags = new Set();
+      state.tasks.forEach(t => (t.tags || []).forEach(tag => allTags.add(tag)));
+      tagChips.innerHTML = "";
+      [...allTags].sort().forEach(tag => {
+        const el = document.createElement("span");
+        el.className = "chip" + (view.tags.has(tag) ? " active" : "");
+        el.textContent = tag;
+        el.onclick = () => { toggleSet(view.tags, tag); render(); };
+        tagChips.appendChild(el);
+      });
+
+      // filter
+      let tasks = state.tasks.slice();
+      if (view.status === "open") tasks = tasks.filter(t => !t.done);
+      if (view.status === "done") tasks = tasks.filter(t => t.done);
+      if (view.pris.size > 0) tasks = tasks.filter(t => view.pris.has(t.priority));
+      if (view.due) tasks = tasks.filter(t => dueStatus(t) === view.due);
+      if (view.tags.size > 0) tasks = tasks.filter(t => (t.tags || []).some(tag => view.tags.has(tag)));
+      if (view.search) {
+        const q = view.search.toLowerCase();
+        tasks = tasks.filter(t =>
+          t.title.toLowerCase().includes(q) || (t.notes || "").toLowerCase().includes(q)
+        );
+      }
+
+      // sort
+      tasks.sort((a, b) => {
+        const s = view.sort;
+        if (s === "created-desc") return b.createdAt.localeCompare(a.createdAt);
+        if (s === "created-asc") return a.createdAt.localeCompare(b.createdAt);
+        if (s === "due-asc") return (a.due || "9999").localeCompare(b.due || "9999");
+        if (s === "due-desc") return (b.due || "0000").localeCompare(a.due || "0000");
+        if (s === "pri-desc") return priorityRank(b.priority) - priorityRank(a.priority);
+        if (s === "pri-asc") return priorityRank(a.priority) - priorityRank(b.priority);
+        return 0;
+      });
+
+      // list
+      listEl.innerHTML = "";
+      tasks.forEach(t => listEl.appendChild(taskCard(t)));
+
+      // stats
+      const open = state.tasks.filter(t => !t.done).length;
+      const done = state.tasks.length - open;
+      statsEl.textContent = `Total ${state.tasks.length}  Open ${open}  Completed ${done}`;
+    }
+
+    function taskCard(t) {
+      const card = document.createElement("div");
+      card.className = "card" + (t.done ? " done" : "");
+      card.setAttribute("role", "listitem");
+
+      const check = document.createElement("input");
+      check.type = "checkbox"; check.className = "check";
+      check.checked = view.selected.has(t.id);
+      check.onchange = () => { toggleSet(view.selected, t.id); };
+
+      const box = document.createElement("input");
+      box.type = "checkbox";
+      box.checked = t.done;
+      box.title = "Mark complete";
+      box.onchange = () => toggleDone(t.id);
+
+      const left = document.createElement("div");
+      left.appendChild(box);
+
+      const mid = document.createElement("div");
+      const title = document.createElement("div");
+      title.textContent = t.title;
+      title.style.fontWeight = "700";
+      mid.appendChild(title);
+
+      if (t.notes) {
+        const notes = document.createElement("div");
+        notes.textContent = t.notes;
+        notes.className = "muted";
+        mid.appendChild(notes);
+      }
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const pri = document.createElement("span");
+      pri.textContent = t.priority + " priority";
+      pri.className = "tag " + (t.priority === "High" ? "pri-high" : t.priority === "Medium" ? "pri-medium" : "pri-low");
+      meta.appendChild(pri);
+      if (t.due) {
+        const due = document.createElement("span");
+        due.textContent = "Due " + fmtDate(t.due);
+        due.className = "tag";
+        meta.appendChild(due);
+      }
+      (t.tags || []).forEach(tag => {
+        const tg = document.createElement("span");
+        tg.textContent = tag;
+        tg.className = "tag";
+        meta.appendChild(tg);
+      });
+      mid.appendChild(meta);
+
+      const actions = document.createElement("div");
+      actions.className = "actions";
+      const bEdit = document.createElement("button");
+      bEdit.textContent = "Edit";
+      bEdit.onclick = () => openEdit(t.id);
+      const bDel = document.createElement("button");
+      bDel.textContent = "Delete";
+      bDel.onclick = () => delTask(t.id);
+      actions.appendChild(check);
+      actions.appendChild(bEdit);
+      actions.appendChild(bDel);
+
+      card.appendChild(left);
+      card.appendChild(mid);
+      card.appendChild(actions);
+      return card;
+    }
+
+    function toggleSet(set, v) {
+      if (set.has(v)) set.delete(v); else set.add(v);
+      render();
+    }
+
+    // CRUD
+    function addTask({ title, notes, due, priority, tags }) {
+      const t = {
+        id: nextId(state),
+        title: title.trim(),
+        notes: (notes || "").trim(),
+        due: due || "",
+        priority: priority || "Medium",
+        tags: tags || [],
+        done: false,
+        createdAt: nowISO(),
+        updatedAt: nowISO()
+      };
+      state.tasks.unshift(t);
+      save(state);
+      render();
+    }
+    function updateTask(id, patch) {
+      const t = state.tasks.find(x => x.id === id);
+      if (!t) return;
+      Object.assign(t, patch);
+      t.updatedAt = nowISO();
+      save(state);
+      render();
+    }
+    function delTask(id) {
+      if (!confirm("Delete this task")) return;
+      state.tasks = state.tasks.filter(t => t.id !== id);
+      view.selected.delete(id);
+      save(state);
+      render();
+    }
+    function toggleDone(id) {
+      const t = state.tasks.find(x => x.id === id);
+      if (!t) return;
+      t.done = !t.done;
+      t.updatedAt = nowISO();
+      save(state);
+      render();
+    }
+
+    // Import Export
+    document.getElementById("btnExport").onclick = () => {
+      const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "todo_backup.json"; a.click();
+      URL.revokeObjectURL(url);
+    };
+    document.getElementById("btnImport").onclick = async () => {
+      const input = document.createElement("input");
+      input.type = "file"; input.accept = "application/json";
+      input.onchange = async () => {
+        const file = input.files[0];
+        if (!file) return;
+        const text = await file.text();
+        try {
+          const data = JSON.parse(text);
+          if (!Array.isArray(data.tasks)) throw new Error("Invalid file");
+          state = { tasks: data.tasks.map(normalizeTask) };
+          save(state); render();
+          alert("Import complete");
+        } catch (e) {
+          alert("Import failed");
+        }
+      };
+      input.click();
+    };
+    function normalizeTask(t) {
+      return {
+        id: t.id || nextId(state),
+        title: String(t.title || "Untitled"),
+        notes: String(t.notes || ""),
+        due: t.due || "",
+        priority: ["Low","Medium","High"].includes(t.priority) ? t.priority : "Medium",
+        tags: Array.isArray(t.tags) ? t.tags : [],
+        done: !!t.done,
+        createdAt: t.createdAt || nowISO(),
+        updatedAt: t.updatedAt || nowISO()
+      };
+    }
+
+    // Bulk actions
+    document.getElementById("btnClearDone").onclick = () => {
+      const n = state.tasks.filter(t => t.done).length;
+      if (n === 0) { alert("Nothing to clear"); return; }
+      if (!confirm("Delete all completed tasks")) return;
+      state.tasks = state.tasks.filter(t => !t.done);
+      save(state); render();
+    };
+    document.getElementById("btnDeleteSelected").onclick = () => {
+      if (view.selected.size === 0) { alert("Select tasks first"); return; }
+      if (!confirm("Delete selected tasks")) return;
+      state.tasks = state.tasks.filter(t => !view.selected.has(t.id));
+      view.selected.clear();
+      save(state); render();
+    };
+    document.getElementById("btnCompleteSelected").onclick = () => {
+      if (view.selected.size === 0) { alert("Select tasks first"); return; }
+      state.tasks.forEach(t => { if (view.selected.has(t.id)) t.done = true; });
+      view.selected.clear();
+      save(state); render();
+    };
+
+    // Filters and controls
+    document.querySelectorAll('[data-status]').forEach(el => {
+      el.onclick = () => {
+        document.querySelectorAll('[data-status]').forEach(x => x.classList.remove("active"));
+        el.classList.add("active");
+        view.status = el.dataset.status;
+        render();
+      };
+    });
+    document.querySelectorAll('[data-pri]').forEach(el => {
+      el.onclick = () => { toggleSet(view.pris, el.dataset.pri); el.classList.toggle("active"); };
+    });
+    document.querySelectorAll('[data-due]').forEach(el => {
+      el.onclick = () => {
+        const val = el.dataset.due;
+        if (view.due === val) { view.due = null; el.classList.remove("active"); }
+        else { document.querySelectorAll('[data-due]').forEach(x => x.classList.remove("active")); view.due = val; el.classList.add("active"); }
+        render();
+      };
+    });
+
+    document.getElementById("sort").onchange = (e) => { view.sort = e.target.value; render(); };
+    document.getElementById("search").oninput = (e) => { view.search = e.target.value; render(); };
+
+    // Quick add
+    document.getElementById("quickAdd").onsubmit = (e) => {
+      e.preventDefault();
+      const title = document.getElementById("qaTitle").value.trim();
+      if (!title) return;
+      addTask({
+        title,
+        notes: "",
+        due: document.getElementById("qaDue").value,
+        priority: document.getElementById("qaPri").value,
+        tags: []
+      });
+      e.target.reset();
+      document.getElementById("qaTitle").focus();
+    };
+
+    // Edit modal
+    function openEdit(id) {
+      const t = state.tasks.find(x => x.id === id);
+      if (!t) return;
+      editingId = id;
+      ed.title.value = t.title;
+      ed.due.value = t.due || "";
+      ed.pri.value = t.priority;
+      ed.notes.value = t.notes || "";
+      ed.tags.value = (t.tags || []).join(", ");
+      modal.classList.add("open");
+      setTimeout(() => ed.title.focus(), 0);
+    }
+    document.getElementById("edCancel").onclick = () => { modal.classList.remove("open"); editingId = null; };
+    document.getElementById("edSave").onclick = () => {
+      if (!editingId) return;
+      updateTask(editingId, {
+        title: ed.title.value.trim() || "Untitled",
+        due: ed.due.value,
+        priority: ed.pri.value,
+        notes: ed.notes.value,
+        tags: parseTags(ed.tags.value)
+      });
+      modal.classList.remove("open");
+      editingId = null;
+    };
+    modal.onclick = (e) => { if (e.target === modal) { modal.classList.remove("open"); editingId = null; } };
+
+    // Keyboard shortcuts
+    window.addEventListener("keydown", (e) => {
+      const tag = document.activeElement.tagName.toLowerCase();
+      if (e.key === "/" && tag !== "input" && tag !== "textarea" && tag !== "select") {
+        e.preventDefault(); document.getElementById("search").focus();
+      }
+      if (e.key === "Enter" && document.activeElement.id === "qaTitle") {
+        // handled by form submit
+      }
+      if (e.key.toLowerCase() === "c" && view.selected.size > 0) {
+        e.preventDefault(); document.getElementById("btnCompleteSelected").click();
+      }
+      if (e.key.toLowerCase() === "e" && view.selected.size === 1) {
+        e.preventDefault(); openEdit([...view.selected][0]);
+      }
+      if (e.key === "Delete" && view.selected.size > 0) {
+        e.preventDefault(); document.getElementById("btnDeleteSelected").click();
+      }
+    });
+
+    // Initial render and demo seed for empty state
+    if (state.tasks.length === 0) {
+      addTask({ title: "Welcome  add your first task", notes: "Use the quick add bar", due: "", priority: "Medium", tags: ["onboarding"] });
+      addTask({ title: "Try filters search and sort", notes: "Click the chips on the left", due: "", priority: "Low", tags: ["tips"] });
+    } else {
+      render();
+    }
+  </script>
+</body>
+</html>
